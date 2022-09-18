@@ -1,0 +1,84 @@
+﻿@{
+    ViewData["Title"] = "Home Page";
+}
+
+@section Scripts {
+
+<script src="~/lib/microsoft/signalr/dist/browser/signalr.min.js"></script>
+
+<script type="text/javascript">
+    $(document).ready(() => {
+
+
+        var connection = new signalR.HubConnectionBuilder().configureLogging
+            (signalR.LogLevel.Information).withAutomaticReconnect([1000,3000,3000,2000]).withUrl("https://localhost:44351/MyHub").build();
+
+        statusShow();
+
+        function statusShow() {
+            $('#conStatus').text(connection.state);
+        }
+
+        function Start() {
+            connection.start().then(() => {
+                statusShow();
+
+            }).catch((err) => {
+                console.log(err);
+                setTimeout(() => Start(), 2000);
+            });
+        }
+
+       
+
+        $('#btnNameSave').click(() => {
+
+            connection.invoke("SendName", $('#txtName').val()).catch((err) => {
+                console.log(err);
+            });
+
+        });
+
+
+        connection.onreconnecting(err => {
+            statusShow();
+
+            console.log("onreconnection: "+err);
+        });
+
+        connection.onreconnected(err => {
+            statusShow();
+            console.log("onreconnected: " + err);
+        });
+
+        connection.onclose(() => {
+            statusShow();
+            console.log("onclose: " + err);
+        });
+
+
+        connection.on("ReciveName", (name) => {
+            console.log(name);
+        });
+
+
+    });
+
+</script>
+}
+<div class="row">
+
+    <div class="col-md-8 offset-2">
+
+        <input class="form-control" type="text" id="txtName" />
+        <hr />
+        <button class="btn btn-primary" id="btnNameSave">İsim Kaydet</button>
+
+        <div class="alert alert-info">
+            Bağlantı Durumu:<strong id="conStatus"></strong>
+
+        </div>
+    </div>
+
+
+</div>

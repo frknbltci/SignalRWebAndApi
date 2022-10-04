@@ -1,4 +1,6 @@
 ﻿using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
+using SignalR.Api.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,6 +10,12 @@ namespace SignalR.Api.Hubs
 {
     public class MyHub : Hub
     {
+        private readonly AppDbContext _context;
+
+        public MyHub(AppDbContext context)
+        {
+            _context = context;
+        }
         private static List<string> Names { get; set; } = new List<string>();
 
         private static int ClientCount { get; set; } = 0;
@@ -37,6 +45,57 @@ namespace SignalR.Api.Hubs
         {
             await Clients.All.SendAsync("ReceiveNames", Names);
         }
+
+        #region Groups
+
+        public async Task AddToGroup(string teamName)
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, teamName);
+        }
+
+
+        public async Task SendNameByGroup(string Name,string teamName)
+        {
+            var team = _context.Teams.Where(x => x.Name == teamName).FirstOrDefault();
+
+            if (team !=null)
+            {
+                team.Users.Add(new User { Name = Name });
+            }
+            else
+            {
+                var newTeam = new Team { Name = teamName };
+
+                newTeam.Users.Add(new User { Name = Name });
+
+                _context.Teams.Add(newTeam);
+            }
+
+            await _context.SaveChangesAsync();
+
+            await Clients.Group(teamName).SendAsync("ReceiveMessageByGroup", Name, teamName);
+
+        }
+
+
+        public async Task GetNamesByGroup()
+        {
+            var teams = _context.Teams.Include(x => x.Users).Select(x => new
+            {
+                teamName = x.Name,
+                Users = x.Users.ToList()
+            });
+
+            await Clients.All.SendAsync("ReceiveNamesByGroup", teams);
+        }
+
+        public async Task RemoveToGroup(string teamName)
+        {
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, teamName);
+        }
+
+
+        #endregion
 
         public async override Task OnConnectedAsync()
         {
